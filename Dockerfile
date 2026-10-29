@@ -1,23 +1,8 @@
-# Build Phase
-FROM golang:1.11-alpine
-
-ENV RESTIC_VERSION="0.12.1"
-
-# Install the items
-RUN apk update \
-  && apk add ca-certificates wget gnupg git \
-  && update-ca-certificates \
-  && wget -qO /tmp/restic-${RESTIC_VERSION}.tar.gz "https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic-${RESTIC_VERSION}.tar.gz" \
-  && cd /tmp \
-  && tar -xf /tmp/restic-${RESTIC_VERSION}.tar.gz -C /tmp/ \
-  && cd /tmp/restic-${RESTIC_VERSION} \
-  && go run build.go \
-  && mv restic /go/bin/restic \
-  && rm -rf /tmp/restic* /var/cache/apk/*
-
+# Take the official static restic binary instead of compiling it here
+FROM restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510 AS restic
 
 # Release phase
-FROM golang:1.11-alpine
+FROM alpine:3.22
 
 # Backup options
 ENV RESTIC_BACKUP_OPTIONS=""
@@ -36,7 +21,7 @@ ENV CRON_BACKUP_EXPRESSION="15   3  *   *   *"
 ENV CRON_CLEANUP_EXPRESSION="15  0  0   *   *"
 
 # Script and config
-COPY --from=0 /go/bin/restic /go/bin/restic
+COPY --from=restic /usr/bin/restic /go/bin/restic
 ADD ./target/start_cron.sh /go/bin
 ADD ./target/supervisor_restic.ini /etc/supervisor.d/restic.ini
 
